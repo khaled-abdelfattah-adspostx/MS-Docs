@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, Star, Tag, Clock, CreditCard, Gift, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Star, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
+import { useMomentScienceSDK } from '../hooks/useMomentScienceSDK';
 
 interface Product {
   id: string;
@@ -14,21 +15,9 @@ interface Product {
   reviews: number;
 }
 
-interface Offer {
-  id: string;
-  type: 'discount' | 'freeShipping' | 'bundle' | 'cashback';
-  title: string;
-  description: string;
-  value: string;
-  trigger: 'cart' | 'checkout' | 'payment';
-  icon: React.ReactNode;
-  color: string;
-}
-
-const MomentsShowcasePage = () => {
+const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = useMomentScienceSDK();
   const [currentStep, setCurrentStep] = useState<'browsing' | 'cart' | 'checkout' | 'payment' | 'success'>('browsing');
   const [cartItems, setCartItems] = useState<Product[]>([]);
-  const [showOffer, setShowOffer] = useState<Offer | null>(null);
   const [customerData, setCustomerData] = useState({
     email: '',
     firstName: '',
@@ -67,70 +56,46 @@ const MomentsShowcasePage = () => {
       originalPrice: 69.99,
       image: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=300&h=300&fit=crop&crop=center',
       rating: 4.7,
-      reviews: 856
-    }
+      reviews: 856    }
   ];
 
-  // Dynamic offers based on moments
-  const offers: Offer[] = [
-    {
-      id: 'cart-discount',
-      type: 'discount',
-      title: '15% Off Your Order',
-      description: 'Complete your purchase in the next 10 minutes',
-      value: '15% OFF',
-      trigger: 'cart',
-      icon: <Tag className="w-5 h-5" />,
-      color: 'bg-gradient-to-r from-red-500 to-pink-500'
-    },
-    {
-      id: 'free-shipping',
-      type: 'freeShipping',
-      title: 'Free Express Shipping',
-      description: 'On orders over $150 - Limited time offer',
-      value: 'FREE SHIPPING',
-      trigger: 'checkout',
-      icon: <Gift className="w-5 h-5" />,
-      color: 'bg-gradient-to-r from-green-500 to-emerald-500'
-    },
-    {
-      id: 'bundle-deal',
-      type: 'bundle',
-      title: 'Bundle & Save 25%',
-      description: 'Add 2 more items and save even more',
-      value: '25% OFF',
-      trigger: 'cart',
-      icon: <ShoppingCart className="w-5 h-5" />,
-      color: 'bg-gradient-to-r from-blue-500 to-indigo-500'
-    },
-    {
-      id: 'cashback',
-      type: 'cashback',
-      title: '10% Cashback',
-      description: 'Earn cashback on your first purchase',
-      value: '10% BACK',
-      trigger: 'payment',
-      icon: <CreditCard className="w-5 h-5" />,
-      color: 'bg-gradient-to-r from-purple-500 to-indigo-500'
-    }
-  ];
-
-  // Trigger offers based on user actions
+  // Initialize MomentScience SDK on component mount
   useEffect(() => {
-    const triggerOffer = () => {
-      const relevantOffers = offers.filter(offer => offer.trigger === currentStep);
-      if (relevantOffers.length > 0 && !showOffer) {
-        const randomOffer = relevantOffers[Math.floor(Math.random() * relevantOffers.length)];
-        setTimeout(() => setShowOffer(randomOffer), 1000);
-      }
-    };
+    initializeSDK({
+      customerId: 'demo-user-123',
+      email: customerData.email || 'demo@example.com',
+      firstName: customerData.firstName || 'Demo',
+      lastName: customerData.lastName || 'User'
+    });
+  }, []);
 
-    if (currentStep === 'cart' && cartItems.length > 0) {
-      triggerOffer();
-    } else if (currentStep === 'checkout' || currentStep === 'payment') {
-      triggerOffer();
+  // Track conversion when reaching success step
+  useEffect(() => {
+    if (currentStep === 'success' && cartItems.length > 0) {
+      const orderId = `order-${Date.now()}`;
+      const orderValue = calculateTotal();
+      
+      trackConversion({
+        email: customerData.email || 'demo@example.com',
+        firstName: customerData.firstName || 'Demo',
+        lastName: customerData.lastName || 'User',
+        customerId: 'demo-user-123',
+        orderId: orderId,
+        orderValue: orderValue,
+        currency: 'USD',
+        items: cartItems.map(item => ({
+          productId: item.id,
+          productName: item.name,
+          price: item.price,
+          quantity: 1
+        })),
+        // Custom properties for MomentScience
+        totalSavings: calculateSavings(),
+        conversionStep: 'purchase_complete',
+        timestamp: new Date().toISOString()
+      });
     }
-  }, [currentStep, cartItems, showOffer]);
+  }, [currentStep, cartItems, customerData]);
 
   const addToCart = (product: Product) => {
     setCartItems(prev => [...prev, product]);
@@ -146,12 +111,14 @@ const MomentsShowcasePage = () => {
   const calculateTotal = () => {
     return cartItems.reduce((sum, item) => sum + item.price, 0);
   };
-
   const calculateSavings = () => {
-    if (showOffer?.type === 'discount') {
-      return calculateTotal() * 0.15;
-    }
-    return 0;
+    // Calculate savings from original prices
+    return cartItems.reduce((sum, item) => {
+      if (item.originalPrice) {
+        return sum + (item.originalPrice - item.price);
+      }
+      return sum;
+    }, 0);
   };
 
   const nextStep = () => {
@@ -159,14 +126,11 @@ const MomentsShowcasePage = () => {
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex < steps.length - 1) {
       setCurrentStep(steps[currentIndex + 1]);
-      setShowOffer(null);
     }
   };
-
   const resetDemo = () => {
     setCurrentStep('browsing');
     setCartItems([]);
-    setShowOffer(null);
     setCustomerData({
       email: '',
       firstName: '',
@@ -202,6 +166,12 @@ const MomentsShowcasePage = () => {
             >
               Reset Demo
             </button>
+            
+            {/* MomentScience SDK Status Indicator */}
+            <div className="flex items-center space-x-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>MomentScience SDK Active</span>
+            </div>
           </div>
           
           <div className="text-center mb-12">
@@ -476,18 +446,11 @@ const MomentsShowcasePage = () => {
                   <div className="border-t border-moment-gray-200 dark:border-moment-gray-600 pt-4 space-y-2">
                     <div className="flex justify-between">
                       <span className="text-moment-gray-600 dark:text-moment-gray-300">Subtotal:</span>
-                      <span className="font-semibold text-moment-gray-900 dark:text-white">${calculateTotal().toFixed(2)}</span>
-                    </div>
-                    {showOffer && showOffer.type === 'discount' && (
+                      <span className="font-semibold text-moment-gray-900 dark:text-white">${calculateTotal().toFixed(2)}</span>                    </div>
+                    {calculateSavings() > 0 && (
                       <div className="flex justify-between text-green-600">
-                        <span>Discount (15%):</span>
+                        <span>Savings:</span>
                         <span>-${calculateSavings().toFixed(2)}</span>
-                      </div>
-                    )}
-                    {showOffer && showOffer.type === 'freeShipping' && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Shipping:</span>
-                        <span>FREE</span>
                       </div>
                     )}
                     <div className="flex justify-between text-xl font-bold text-moment-gray-900 dark:text-white pt-2 border-t border-moment-gray-200 dark:border-moment-gray-600">
@@ -520,29 +483,73 @@ const MomentsShowcasePage = () => {
                   <p className="text-lg text-moment-gray-600 dark:text-moment-gray-300 mb-8">
                     Thank you for your purchase. Your order has been confirmed and will be shipped soon.
                   </p>
-                  
-                  <div className="bg-moment-gray-50 dark:bg-moment-gray-700 rounded-xl p-6 mb-8">
+                    <div className="bg-moment-gray-50 dark:bg-moment-gray-700 rounded-xl p-6 mb-8">
                     <h3 className="text-lg font-semibold text-moment-gray-900 dark:text-white mb-4">
-                      MomentScience Offers Delivered:
+                      MomentScience Features Demonstrated:
+                    </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Customer data captured</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Behavioral tracking active</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Conversion data sent</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Total value: ${calculateTotal().toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* MomentScience Conversion Tracking Information */}
+                  <div className="bg-moment-primary/10 dark:bg-moment-primary/20 rounded-xl p-6 mb-8 border border-moment-primary/20">
+                    <h3 className="text-lg font-semibold text-moment-primary dark:text-moment-primary-light mb-4 flex items-center">
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      MomentScience Conversion Tracked
                     </h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Cart abandonment offer triggered</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-moment-gray-600 dark:text-moment-gray-300">Order Value:</span>
+                          <span className="font-semibold text-moment-gray-900 dark:text-white">${calculateTotal().toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-moment-gray-600 dark:text-moment-gray-300">Items Count:</span>
+                          <span className="font-semibold text-moment-gray-900 dark:text-white">{cartItems.length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-moment-gray-600 dark:text-moment-gray-300">Currency:</span>
+                          <span className="font-semibold text-moment-gray-900 dark:text-white">USD</span>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Checkout incentive applied</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-moment-gray-600 dark:text-moment-gray-300">Customer ID:</span>
+                          <span className="font-semibold text-moment-gray-900 dark:text-white">demo-user-123</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-moment-gray-600 dark:text-moment-gray-300">SDK Status:</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">Active</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-moment-gray-600 dark:text-moment-gray-300">Data Sent:</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">✓ Success</span>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Payment completion bonus</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-moment-gray-600 dark:text-moment-gray-300">Total savings: ${calculateSavings().toFixed(2)}</span>
-                      </div>
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-white/50 dark:bg-moment-gray-800/50 rounded-lg">
+                      <p className="text-xs text-moment-gray-600 dark:text-moment-gray-400">
+                        <strong>Integration Note:</strong> This conversion data has been automatically sent to MomentScience using the JS SDK. 
+                        The data includes customer information, order details, and custom properties for personalized offer delivery.
+                      </p>
                     </div>
                   </div>
                   
@@ -555,50 +562,8 @@ const MomentsShowcasePage = () => {
                 </div>
               </motion.div>
             )}
-          </AnimatePresence>
-        </div>
+          </AnimatePresence>        </div>
       </div>
-
-      {/* Floating Offer Banner */}
-      <AnimatePresence>
-        {showOffer && (
-          <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            className="fixed bottom-6 left-6 right-6 z-50"
-          >
-            <div className={`${showOffer.color} rounded-2xl p-6 shadow-2xl max-w-md mx-auto`}>
-              <div className="flex items-start justify-between text-white">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 mt-1">
-                    {showOffer.icon}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-lg mb-1">{showOffer.title}</h4>
-                    <p className="text-white/90 text-sm mb-3">{showOffer.description}</p>
-                    <div className="flex items-center space-x-3">
-                      <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
-                        {showOffer.value}
-                      </span>
-                      <div className="flex items-center space-x-1 text-white/80">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm">Limited time</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowOffer(null)}
-                  className="text-white/80 hover:text-white transition-colors"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
