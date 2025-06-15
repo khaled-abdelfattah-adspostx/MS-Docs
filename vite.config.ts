@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000,
     host: true
   },
-  base: '/MS-Docs/', // Replace with your GitHub repository name
+  base: '/MS-Docs/', // Update this to match your actual GitHub repository name
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
