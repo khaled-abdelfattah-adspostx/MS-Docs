@@ -1,3 +1,9 @@
+interface PayloadProperty {
+  key: string;
+  value: string;
+  type: 'string' | 'number' | 'boolean';
+}
+
 interface AdpxUser {
   email?: string;
   firstName?: string;
@@ -17,7 +23,81 @@ interface AdpxUser {
 
 interface AdpxConfig {
   accountId: string;
-  autoShow: boolean;
+  autoLoad?: boolean;
+  autoShow?: boolean;
+  dev?: boolean;
+  settings?: {
+    ad_position?: string;
+    darken_bg?: boolean;
+    darken_bg_non_centered?: boolean;
+    delay?: number;
+    privacy_policy?: string;
+    screen_margin?: number;
+    show_disclaimer?: boolean;
+    button_order?: string;
+    enable_vertical_offset?: boolean;
+    mobile_vertical_offset?: number;
+    multi_offer_unit?: boolean;
+    show_ads_on_exit?: boolean;
+    close_ad_on_click_outside?: boolean;
+    ad_animation?: string;
+    show_close?: boolean;
+    enable_close_delay?: boolean;
+    close_delay?: number;
+    embedded?: {
+      enabled?: boolean;
+      fill_container?: boolean;
+      showBorder?: boolean;
+      showHeader?: boolean;
+      showFooter?: boolean;
+      targetElement?: string;
+    };
+    enable_effect_shimmer_pos_cta?: boolean;
+    enable_offerwall?: boolean;
+    fixed_progress_bar?: boolean;
+    open_offerwall?: boolean;
+    open_overlay_offerwall?: boolean;
+    offerText?: {
+      font?: string;
+      textColor?: string;
+      tileTextAlignment?: string;
+      buttonRadius?: string;
+      fontSizeTitle?: string;
+      fontSizeDescription?: string;
+    };
+    [key: string]: any;
+  };
+  styles?: {
+    offerText?: {
+      buttonNo?: {
+        background?: string;
+        color?: string;
+        hover?: string;
+        stroke?: string;
+      };
+      buttonYes?: {
+        background?: string;
+        color?: string;
+        hover?: string;
+        stroke?: string;
+      };
+      font?: string;
+      fontSize?: number;
+      textColor?: string;
+      offerwall_mou_button_radius?: number;
+      show_image?: boolean;
+    };
+    header?: {
+      background?: string;
+      fontSize?: number;
+      lead_in_text?: string;
+      lead_in_text_color?: string;
+      headLineAndLeadInFontSize?: number;
+      text?: string;
+      textColor?: string;
+    };
+    [key: string]: any;
+  };
 }
 
 declare global {
@@ -31,11 +111,15 @@ declare global {
 }
 
 export const useMomentScienceSDK = () => {
-  const initializeSDK = (userData?: AdpxUser) => {
-    // Set up MomentScience configuration
+  const initializeSDK = (userData?: AdpxUser, config?: Partial<AdpxConfig>, customPayload?: PayloadProperty[]) => {
+    // Set up MomentScience configuration with custom or default values
     window.AdpxConfig = {
-      accountId: 'ffa59da09972e55e',
-      autoShow: true
+      accountId: config?.accountId || 'ffa59da09972e55e',
+      autoLoad: config?.autoLoad ?? true,
+      autoShow: config?.autoShow ?? true,
+      dev: config?.dev ?? false,
+      settings: config?.settings ?? {},
+      styles: config?.styles ?? {}
     };
 
     // Set user data if provided
@@ -45,6 +129,28 @@ export const useMomentScienceSDK = () => {
       };
     } else {
       window.AdpxUser = {};
+    }    // Add custom payload properties if provided
+    if (customPayload && customPayload.length > 0) {
+      // Ensure AdpxUser exists
+      if (!window.AdpxUser) {
+        window.AdpxUser = {};
+      }
+      
+      customPayload.forEach(prop => {
+        if (prop.key && prop.value && window.AdpxUser) {
+          let processedValue: any = prop.value;
+          
+          // Convert value based on type
+          if (prop.type === 'number') {
+            processedValue = parseFloat(prop.value) || 0;
+          } else if (prop.type === 'boolean') {
+            processedValue = prop.value.toLowerCase() === 'true';
+          }
+          
+          // Add to AdpxUser object
+          window.AdpxUser[prop.key] = processedValue;
+        }
+      });
     }
 
     // Load and initialize the SDK
@@ -97,11 +203,11 @@ export const useMomentScienceSDK = () => {
       window.Adpx.init(window.AdpxConfig);
     }
   };
-
   return {
     initializeSDK,
     trackConversion
   };
 };
 
+export type { PayloadProperty };
 export default useMomentScienceSDK;

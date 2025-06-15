@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Star, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Star, CheckCircle, Settings, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
-import { useMomentScienceSDK } from '../hooks/useMomentScienceSDK';
+import { useMomentScienceSDK, PayloadProperty } from '../hooks/useMomentScienceSDK';
 
 interface Product {
   id: string;
@@ -15,9 +15,51 @@ interface Product {
   reviews: number;
 }
 
-const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = useMomentScienceSDK();
+const MomentsShowcasePage = () => {
+  const { initializeSDK, trackConversion } = useMomentScienceSDK();
   const [currentStep, setCurrentStep] = useState<'browsing' | 'cart' | 'checkout' | 'payment' | 'success'>('browsing');
   const [cartItems, setCartItems] = useState<Product[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+    // Custom Payload State
+  const [customPayload, setCustomPayload] = useState<PayloadProperty[]>([
+    { key: 'placement', value: 'post_transaction', type: 'string' },
+    { key: 'theme_id', value: 'moment_post_transaction', type: 'string' },
+    { key: 'country', value: 'US', type: 'string' }
+  ]);
+  const [tempPayload, setTempPayload] = useState<PayloadProperty[]>(customPayload);
+  // SDK Configuration State
+  const [sdkConfig, setSdkConfig] = useState({
+    accountId: 'ffa59da09972e55e', // Default MomentScience account ID
+    autoLoad: true,
+    autoShow: true,
+    dev: false,
+    settings: {
+      ad_position: 'center',
+      darken_bg: true,
+      delay: 0,
+      screen_margin: 20,
+      show_disclaimer: true,
+      show_close: true,
+      multi_offer_unit: false
+    },
+    styles: {
+      offerText: {
+        font: 'Roboto',
+        fontSize: 14,
+        textColor: '#000000'
+      },
+      header: {
+        background: '#0b1937',
+        text: 'Your order is complete',
+        textColor: '#ffffff',
+        fontSize: 16
+      }
+    }
+  });
+  
+  // Temporary state for sidebar form (allows editing without immediate apply)
+  const [tempConfig, setTempConfig] = useState(sdkConfig);
+  
   const [customerData, setCustomerData] = useState({
     email: '',
     firstName: '',
@@ -57,21 +99,24 @@ const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = 
       image: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=300&h=300&fit=crop&crop=center',
       rating: 4.7,
       reviews: 856    }
-  ];
-
-  // Initialize MomentScience SDK on component mount
-  useEffect(() => {
-    initializeSDK({
-      customerId: 'demo-user-123',
-      email: customerData.email || 'demo@example.com',
-      firstName: customerData.firstName || 'Demo',
-      lastName: customerData.lastName || 'User'
-    });
-  }, []);
-
-  // Track conversion when reaching success step
+  ];  // Initialize and track conversion when reaching success step
   useEffect(() => {
     if (currentStep === 'success' && cartItems.length > 0) {
+      // Initialize SDK with full configuration
+      initializeSDK({
+        customerId: 'demo-user-123',
+        email: customerData.email || 'demo@example.com',
+        firstName: customerData.firstName || 'Demo',
+        lastName: customerData.lastName || 'User'      }, {
+        accountId: sdkConfig.accountId,
+        autoLoad: sdkConfig.autoLoad,
+        autoShow: sdkConfig.autoShow,
+        dev: sdkConfig.dev,
+        settings: sdkConfig.settings,
+        styles: sdkConfig.styles
+      }, customPayload);
+      
+      // Track conversion
       const orderId = `order-${Date.now()}`;
       const orderValue = calculateTotal();
       
@@ -95,7 +140,7 @@ const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = 
         timestamp: new Date().toISOString()
       });
     }
-  }, [currentStep, cartItems, customerData]);
+  }, [currentStep, cartItems, customerData, sdkConfig, customPayload, initializeSDK, trackConversion]);
 
   const addToCart = (product: Product) => {
     setCartItems(prev => [...prev, product]);
@@ -143,10 +188,568 @@ const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = 
       cvv: ''
     });
   };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-moment-light via-white to-blue-50 dark:from-moment-gray-900 dark:via-moment-gray-800 dark:to-moment-gray-900">
       <Header />
+        {/* SDK Configuration Sidebar */}
+      <div className={`fixed top-20 right-0 h-full bg-white dark:bg-moment-gray-800 shadow-2xl transform transition-transform duration-300 z-40 overflow-y-auto ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: '420px' }}>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-moment-gray-900 dark:text-white">SDK Configuration</h2>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 text-moment-gray-600 dark:text-moment-gray-300 hover:text-moment-primary dark:hover:text-moment-accent transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="space-y-6">
+            {/* Account ID */}
+            <div>
+              <label className="block text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300 mb-2">
+                Account ID *
+              </label>
+              <input
+                type="text"
+                value={tempConfig.accountId}
+                onChange={(e) => setTempConfig({...tempConfig, accountId: e.target.value})}
+                placeholder="Enter your SDK Account ID"
+                className="w-full px-3 py-2 border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+              />
+              <p className="text-xs text-moment-gray-500 dark:text-moment-gray-400 mt-1">
+                Your unique MomentScience account identifier
+              </p>
+            </div>
+
+            {/* Auto Load */}
+            <div>
+              <label className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={tempConfig.autoLoad}
+                  onChange={(e) => setTempConfig({...tempConfig, autoLoad: e.target.checked})}
+                  className="w-4 h-4 text-moment-primary border-moment-gray-300 rounded focus:ring-moment-primary"
+                />
+                <div>
+                  <span className="text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300">
+                    Auto Load
+                  </span>
+                  <p className="text-xs text-moment-gray-500 dark:text-moment-gray-400">
+                    Automatically fetch available offers when SDK is ready
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Auto Show */}
+            <div>
+              <label className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={tempConfig.autoShow}
+                  onChange={(e) => setTempConfig({...tempConfig, autoShow: e.target.checked})}
+                  className="w-4 h-4 text-moment-primary border-moment-gray-300 rounded focus:ring-moment-primary"
+                />
+                <div>
+                  <span className="text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300">
+                    Auto Show
+                  </span>
+                  <p className="text-xs text-moment-gray-500 dark:text-moment-gray-400">
+                    Automatically display offers overlay when ready
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Development Mode */}
+            <div>
+              <label className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={tempConfig.dev}
+                  onChange={(e) => setTempConfig({...tempConfig, dev: e.target.checked})}
+                  className="w-4 h-4 text-moment-primary border-moment-gray-300 rounded focus:ring-moment-primary"
+                />
+                <div>
+                  <span className="text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300">
+                    Development Mode
+                  </span>
+                  <p className="text-xs text-moment-gray-500 dark:text-moment-gray-400">
+                    Enable testing mode with sample offers (no activity recorded)
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Settings Override Section */}
+            <div>
+              <h4 className="text-lg font-semibold text-moment-gray-800 dark:text-white mb-3">
+                Display Settings Override
+              </h4>
+              
+              {/* Ad Position */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300 mb-2">
+                  Ad Position
+                </label>
+                <select
+                  value={tempConfig.settings?.ad_position || 'center'}
+                  onChange={(e) => setTempConfig({
+                    ...tempConfig,
+                    settings: {...(tempConfig.settings || {}), ad_position: e.target.value}
+                  })}
+                  className="w-full px-3 py-2 border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                >
+                  <option value="center">Center</option>
+                  <option value="bottom-center">Bottom Center</option>
+                  <option value="bottom-left">Bottom Left</option>
+                  <option value="bottom-right">Bottom Right</option>
+                  <option value="top-center">Top Center</option>
+                  <option value="top-left">Top Left</option>
+                  <option value="top-right">Top Right</option>
+                </select>
+              </div>
+
+              {/* Darken Background */}
+              <div className="mb-4">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={tempConfig.settings?.darken_bg ?? true}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      settings: {...(tempConfig.settings || {}), darken_bg: e.target.checked}
+                    })}
+                    className="w-4 h-4 text-moment-primary border-moment-gray-300 rounded focus:ring-moment-primary"
+                  />
+                  <div>
+                    <span className="text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300">
+                      Darken Background
+                    </span>
+                    <p className="text-xs text-moment-gray-500 dark:text-moment-gray-400">
+                      Darkens the background behind the offer unit
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Display Delay */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300 mb-2">
+                  Display Delay (seconds)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  value={tempConfig.settings?.delay || 0}
+                  onChange={(e) => setTempConfig({
+                    ...tempConfig,
+                    settings: {...(tempConfig.settings || {}), delay: parseInt(e.target.value) || 0}
+                  })}
+                  className="w-full px-3 py-2 border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                />
+              </div>
+
+              {/* Screen Margin */}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300 mb-2">
+                  Screen Margin (pixels)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={tempConfig.settings?.screen_margin || 20}
+                  onChange={(e) => setTempConfig({
+                    ...tempConfig,
+                    settings: {...(tempConfig.settings || {}), screen_margin: parseInt(e.target.value) || 20}
+                  })}
+                  className="w-full px-3 py-2 border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                />
+              </div>
+
+              {/* Show Disclaimer */}
+              <div className="mb-4">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={tempConfig.settings?.show_disclaimer ?? true}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      settings: {...(tempConfig.settings || {}), show_disclaimer: e.target.checked}
+                    })}
+                    className="w-4 h-4 text-moment-primary border-moment-gray-300 rounded focus:ring-moment-primary"
+                  />
+                  <span className="text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300">
+                    Show Disclaimer
+                  </span>
+                </label>
+              </div>
+
+              {/* Show Close Button */}
+              <div className="mb-4">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={tempConfig.settings?.show_close ?? true}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      settings: {...(tempConfig.settings || {}), show_close: e.target.checked}
+                    })}
+                    className="w-4 h-4 text-moment-primary border-moment-gray-300 rounded focus:ring-moment-primary"
+                  />
+                  <span className="text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300">
+                    Show Close Button
+                  </span>
+                </label>
+              </div>
+
+              {/* Multi Offer Unit */}
+              <div>
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={tempConfig.settings?.multi_offer_unit ?? false}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      settings: {...(tempConfig.settings || {}), multi_offer_unit: e.target.checked}
+                    })}
+                    className="w-4 h-4 text-moment-primary border-moment-gray-300 rounded focus:ring-moment-primary"
+                  />
+                  <div>
+                    <span className="text-sm font-semibold text-moment-gray-700 dark:text-moment-gray-300">
+                      Multi Offer Unit (MOU)
+                    </span>
+                    <p className="text-xs text-moment-gray-500 dark:text-moment-gray-400">
+                      Enable multiple offers display instead of single offer
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Styles Override Section */}
+            <div>
+              <h4 className="text-lg font-semibold text-moment-gray-800 dark:text-white mb-3">
+                Styling Override Options
+              </h4>
+              
+              {/* Header Styles */}
+              <div className="mb-4">
+                <h5 className="text-md font-semibold text-moment-gray-700 dark:text-moment-gray-300 mb-3">Header Styling</h5>
+                
+                {/* Header Background */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-moment-gray-700 dark:text-moment-gray-300 mb-1">
+                    Background Color
+                  </label>
+                  <input
+                    type="color"
+                    value={tempConfig.styles?.header?.background || '#0b1937'}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      styles: {
+                        ...(tempConfig.styles || {}),
+                        header: {...(tempConfig.styles?.header || {}), background: e.target.value}
+                      }
+                    })}
+                    className="w-full h-10 border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg"
+                  />
+                </div>
+
+                {/* Header Text */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-moment-gray-700 dark:text-moment-gray-300 mb-1">
+                    Header Text
+                  </label>
+                  <input
+                    type="text"
+                    value={tempConfig.styles?.header?.text || 'Your order is complete'}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      styles: {
+                        ...(tempConfig.styles || {}),
+                        header: {...(tempConfig.styles?.header || {}), text: e.target.value}
+                      }
+                    })}
+                    className="w-full px-3 py-2 text-sm border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                  />
+                </div>
+
+                {/* Header Text Color */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-moment-gray-700 dark:text-moment-gray-300 mb-1">
+                    Text Color
+                  </label>
+                  <input
+                    type="color"
+                    value={tempConfig.styles?.header?.textColor || '#ffffff'}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      styles: {
+                        ...(tempConfig.styles || {}),
+                        header: {...(tempConfig.styles?.header || {}), textColor: e.target.value}
+                      }
+                    })}
+                    className="w-full h-10 border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg"
+                  />
+                </div>
+
+                {/* Header Font Size */}
+                <div>
+                  <label className="block text-sm font-medium text-moment-gray-700 dark:text-moment-gray-300 mb-1">
+                    Font Size (px)
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="24"
+                    value={tempConfig.styles?.header?.fontSize || 16}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      styles: {
+                        ...(tempConfig.styles || {}),
+                        header: {...(tempConfig.styles?.header || {}), fontSize: parseInt(e.target.value) || 16}
+                      }
+                    })}
+                    className="w-full px-3 py-2 text-sm border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Offer Text Styles */}
+              <div>
+                <h5 className="text-md font-semibold text-moment-gray-700 dark:text-moment-gray-300 mb-3">Offer Text Styling</h5>
+                
+                {/* Font Family */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-moment-gray-700 dark:text-moment-gray-300 mb-1">
+                    Font Family
+                  </label>
+                  <select
+                    value={tempConfig.styles?.offerText?.font || 'Roboto'}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      styles: {
+                        ...(tempConfig.styles || {}),
+                        offerText: {...(tempConfig.styles?.offerText || {}), font: e.target.value}
+                      }
+                    })}
+                    className="w-full px-3 py-2 text-sm border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                  >
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Inter">Inter</option>
+                  </select>
+                </div>
+
+                {/* Font Size */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-moment-gray-700 dark:text-moment-gray-300 mb-1">
+                    Font Size (px)
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="20"
+                    value={tempConfig.styles?.offerText?.fontSize || 14}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      styles: {
+                        ...(tempConfig.styles || {}),
+                        offerText: {...(tempConfig.styles?.offerText || {}), fontSize: parseInt(e.target.value) || 14}
+                      }
+                    })}
+                    className="w-full px-3 py-2 text-sm border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                  />
+                </div>
+
+                {/* Text Color */}
+                <div>
+                  <label className="block text-sm font-medium text-moment-gray-700 dark:text-moment-gray-300 mb-1">
+                    Text Color
+                  </label>
+                  <input
+                    type="color"
+                    value={tempConfig.styles?.offerText?.textColor || '#000000'}
+                    onChange={(e) => setTempConfig({
+                      ...tempConfig,
+                      styles: {
+                        ...(tempConfig.styles || {}),
+                        offerText: {...(tempConfig.styles?.offerText || {}), textColor: e.target.value}
+                      }
+                    })}
+                    className="w-full h-10 border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Payload Section */}
+            <div>
+              <h4 className="text-lg font-semibold text-moment-gray-800 dark:text-white mb-3">
+                Custom Payload Properties
+              </h4>
+              <p className="text-sm text-moment-gray-600 dark:text-moment-gray-400 mb-4">
+                Add custom key-value pairs to be passed to the MomentScience SDK for offer personalization and enhanced targeting.
+              </p>
+              
+              {/* Payload List */}
+              <div className="space-y-3 mb-4">
+                {tempPayload.map((payload, index) => (
+                  <div key={index} className="flex space-x-2 items-start">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        placeholder="Key (e.g., placement)"
+                        value={payload.key}
+                        onChange={(e) => {
+                          const newPayload = [...tempPayload];
+                          newPayload[index] = { ...payload, key: e.target.value };
+                          setTempPayload(newPayload);
+                        }}
+                        className="w-full px-3 py-2 text-sm border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        placeholder="Value"
+                        value={payload.value}
+                        onChange={(e) => {
+                          const newPayload = [...tempPayload];
+                          newPayload[index] = { ...payload, value: e.target.value };
+                          setTempPayload(newPayload);
+                        }}
+                        className="w-full px-3 py-2 text-sm border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div className="w-20">
+                      <select
+                        value={payload.type}
+                        onChange={(e) => {
+                          const newPayload = [...tempPayload];
+                          newPayload[index] = { ...payload, type: e.target.value as 'string' | 'number' | 'boolean' };
+                          setTempPayload(newPayload);
+                        }}
+                        className="w-full px-2 py-2 text-sm border border-moment-gray-300 dark:border-moment-gray-600 rounded-lg bg-white dark:bg-moment-gray-700 text-moment-gray-900 dark:text-white focus:ring-2 focus:ring-moment-primary focus:border-transparent"
+                      >
+                        <option value="string">String</option>
+                        <option value="number">Number</option>
+                        <option value="boolean">Boolean</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newPayload = tempPayload.filter((_, i) => i !== index);
+                        setTempPayload(newPayload);
+                      }}
+                      className="p-2 text-red-500 hover:text-red-700 transition-colors"
+                      title="Remove payload property"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Add New Payload Button */}
+              <button
+                onClick={() => {
+                  setTempPayload([...tempPayload, { key: '', value: '', type: 'string' }]);
+                }}
+                className="w-full px-3 py-2 border-2 border-dashed border-moment-gray-300 dark:border-moment-gray-600 rounded-lg text-moment-gray-600 dark:text-moment-gray-400 hover:border-moment-primary hover:text-moment-primary transition-colors"
+              >
+                + Add Payload Property
+              </button>
+              
+              {/* Payload Examples */}
+              <div className="mt-4 p-3 bg-moment-gray-50 dark:bg-moment-gray-700 rounded-lg">
+                <h6 className="text-sm font-semibold text-moment-gray-800 dark:text-white mb-2">Common Examples:</h6>
+                <div className="text-xs text-moment-gray-600 dark:text-moment-gray-400 space-y-1">
+                  <div><strong>placement:</strong> post_transaction</div>
+                  <div><strong>theme_id:</strong> moment_post_transaction</div>
+                  <div><strong>country:</strong> US</div>
+                  <div><strong>zipcode:</strong> 12345</div>
+                  <div><strong>loyalty_program_id:</strong> 23445665393</div>
+                </div>
+              </div>
+            </div>            {/* Save Button */}
+            <div className="pt-4 border-t border-moment-gray-200 dark:border-moment-gray-600">
+              <button
+                onClick={() => {
+                  setSdkConfig(tempConfig);
+                  setCustomPayload(tempPayload);
+                  setSidebarOpen(false);
+                }}
+                className="w-full bg-gradient-to-r from-moment-primary to-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:shadow-lg transition-all duration-300"
+              >
+                Save Configuration
+              </button>
+              
+              <button
+                onClick={() => {
+                  setTempConfig(sdkConfig);
+                  setTempPayload(customPayload);
+                }}
+                className="w-full mt-2 bg-moment-gray-200 dark:bg-moment-gray-600 text-moment-gray-700 dark:text-moment-gray-300 py-2 px-4 rounded-lg font-medium hover:bg-moment-gray-300 dark:hover:bg-moment-gray-500 transition-colors"
+              >
+                Reset to Saved
+              </button>
+            </div>            {/* Current Status */}
+            <div className="bg-moment-gray-50 dark:bg-moment-gray-700 rounded-lg p-4">
+              <h5 className="font-semibold text-moment-gray-800 dark:text-white mb-2">SDK Status</h5>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-moment-gray-600 dark:text-moment-gray-300">Account ID:</span>
+                  <span className="font-mono text-xs text-moment-gray-900 dark:text-white">
+                    {sdkConfig.accountId.substring(0, 8)}...
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-moment-gray-600 dark:text-moment-gray-300">Initialization:</span>
+                  <span className="text-orange-600 dark:text-orange-400">
+                    {currentStep === 'success' ? 'Active' : 'Pending Purchase'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-moment-gray-600 dark:text-moment-gray-300">Mode:</span>
+                  <span className={sdkConfig.dev ? "text-yellow-600" : "text-green-600"}>
+                    {sdkConfig.dev ? 'Development' : 'Production'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-moment-gray-600 dark:text-moment-gray-300">Custom Payload:</span>
+                  <span className="text-blue-600 dark:text-blue-400">
+                    {customPayload.length} properties
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Sidebar Toggle Button */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className={`fixed top-24 right-4 p-3 bg-moment-primary text-white rounded-full shadow-lg hover:bg-moment-primary/90 transition-all duration-300 z-30 ${sidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      >
+        <Settings className="w-5 h-5" />
+      </button>
+      
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       
       {/* Hero Section */}
       <div className="pt-20 pb-8 px-4 sm:px-6 lg:px-8">
@@ -166,11 +769,20 @@ const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = 
             >
               Reset Demo
             </button>
-            
-            {/* MomentScience SDK Status Indicator */}
-            <div className="flex items-center space-x-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>MomentScience SDK Active</span>
+              {/* MomentScience SDK Status Indicator */}
+            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
+              currentStep === 'success' 
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
+                : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                currentStep === 'success' 
+                  ? 'bg-green-500 animate-pulse' 
+                  : 'bg-orange-500'
+              }`}></div>
+              <span>
+                {currentStep === 'success' ? 'MomentScience SDK Active' : 'MomentScience SDK Ready'}
+              </span>
             </div>
           </div>
           
@@ -528,11 +1140,14 @@ const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = 
                           <span className="text-moment-gray-600 dark:text-moment-gray-300">Currency:</span>
                           <span className="font-semibold text-moment-gray-900 dark:text-white">USD</span>
                         </div>
-                      </div>
-                      <div className="space-y-2">
+                      </div>                      <div className="space-y-2">
                         <div className="flex justify-between">
                           <span className="text-moment-gray-600 dark:text-moment-gray-300">Customer ID:</span>
                           <span className="font-semibold text-moment-gray-900 dark:text-white">demo-user-123</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-moment-gray-600 dark:text-moment-gray-300">Account ID:</span>
+                          <span className="font-semibold text-moment-gray-900 dark:text-white font-mono text-xs">{sdkConfig.accountId}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-moment-gray-600 dark:text-moment-gray-300">SDK Status:</span>
@@ -544,11 +1159,10 @@ const MomentsShowcasePage = () => {  const { initializeSDK, trackConversion } = 
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="mt-4 p-3 bg-white/50 dark:bg-moment-gray-800/50 rounded-lg">
+                      <div className="mt-4 p-3 bg-white/50 dark:bg-moment-gray-800/50 rounded-lg">
                       <p className="text-xs text-moment-gray-600 dark:text-moment-gray-400">
-                        <strong>Integration Note:</strong> This conversion data has been automatically sent to MomentScience using the JS SDK. 
-                        The data includes customer information, order details, and custom properties for personalized offer delivery.
+                        <strong>Integration Note:</strong> This conversion data has been automatically sent to MomentScience using the configured account ID from the settings panel. 
+                        Use the settings button (⚙️) to customize SDK parameters including account ID, auto-show options, and test mode.
                       </p>
                     </div>
                   </div>
