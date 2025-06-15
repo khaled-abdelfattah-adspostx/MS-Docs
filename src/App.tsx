@@ -16,9 +16,9 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
-
   return (
-    <Router>      <Routes>
+    <Router basename="/MS-Docs">
+      <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/api-explorer" element={<ApiExplorerPage />} />
         <Route path="/moments-showcase" element={<MomentsShowcasePage />} />
